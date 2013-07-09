@@ -68,7 +68,7 @@ var workerAvailable = function(worker) {
     });
 }
 
-var reactorOutput = function(output) {
+var reactorOutput = function(reactor, output) {
     switch (output.data.type) {
         case 'msg':
             var message = output.data.message;
@@ -93,7 +93,7 @@ var startup = function(n) {
     started = true;
     _.each(_.range(n), function(i) {
         var reactor = new Worker('reactor.js');
-        reactor.onmessage = reactorOutput;
+        reactor.onmessage = function(output){reactorOutput(reactor,output);};
         workerAvailable(reactor);
     });
 }
