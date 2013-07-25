@@ -119,6 +119,7 @@ self.onmessage = function (input) {
         postDone(node);
         break;
 
+    /*
     case 'liftN':
         var fromQ = node.queues[msg.from];
         fromQ.push(msg);
@@ -144,6 +145,7 @@ self.onmessage = function (input) {
         // TODO tryKeepRunning
         postDone(node);
         break;
+    */
 
     default:
         break;
