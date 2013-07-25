@@ -31,6 +31,16 @@ var mouse = function() {
     return mouseId;
 }
 
+// clicks : Signal ()
+var clicks = function() {
+    var unit = { type : 'unit' };
+    var clicksId =  input(unit);
+    window.onclick = function(e) {
+        triggerInput(clicksId, unit);
+    };
+    return clicksId;
+}
+
 // print : Signal a -> Component
 var print = function(parentId) {
     var printOutput = output(function(x) {

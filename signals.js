@@ -22,5 +22,9 @@ var cc0 = fmap('concat', 'a', label);
 var cc = app('b', cc0, c);
 //print(cc);
 
+var clicks = clicks();
+var sample = sampleOn(clicks, s);
+show('sample', sample);
+
 startup(3);
 

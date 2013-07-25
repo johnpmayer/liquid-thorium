@@ -38,8 +38,10 @@ var schedule  = function(msg) {
     var nodeId = msg.to;
     var ctx = contexts[nodeId];
     if (ctx.node.type === 'output') {
-        // blocks the scheduler for I/O
-        ctx.node.action(msg.value);
+        if (msg.changed) {
+            // blocks the scheduler for I/O
+            ctx.node.action(msg.value);
+        }
     } else {
         var inbox = ctx.inbox;
         if (ctx.state === 'idle' && inbox.length === 0) {
@@ -63,9 +65,11 @@ var workerAvailable = function(worker) {
     }
     var ctx = contexts[nodeId];
     ctx.state = 'running';
+    var node = ctx.node;
+    var msg = ctx.inbox.shift();
     worker.postMessage({
-        node: ctx.node,
-        msg: ctx.inbox.shift()
+        node: node,
+        msg: msg
     });
 }
 
