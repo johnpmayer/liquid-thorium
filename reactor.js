@@ -56,6 +56,25 @@ self.onmessage = function (input) {
         postDone(node);
         break;
 
+    case 'sampleOn':
+        var fromQ = node.queues[msg.from];
+        fromQ.push(msg);
+        var waiting = _.some(node.queues, function(queue) {
+            return (queue.length === 0);
+        });
+        if (!waiting) {
+            var triggerMsg = node.queues[node.triggerId].shift();
+            var sampleMsg = node.queues[node.sampleId].shift();
+            var changed = triggerMsg.changed;
+            if (sampleMsg.changed) {
+                node.lastSample = sampleMsg.value;
+            }
+            value = changed ? node.lastSample : undefined;
+            postKids(node, changed, value); 
+        }
+        postDone(node);
+        break;
+
     case 'app':
         var fromQ = node.queues[msg.from];
         fromQ.push(msg);

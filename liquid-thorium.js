@@ -170,6 +170,29 @@ var app = function(argName, fId, argId) {
 
 };
 
+var sampleOn = function(triggerId, sampleId) {
+    
+    var queues = {};
+    var lastVals = {};
+    _.each([triggerId,sampleId], function(parentId) {
+        queues[parentId] = [];
+    });
+    
+    var id = basicNode('sampleOn', {
+        triggerId: triggerId,
+        sampleId: sampleId,
+        queues: queues,
+        lastSample: undefined
+    });
+    
+    _.each([triggerId,sampleId], function(parentId) {
+        link(parentId, id);
+    });
+
+    return id;
+
+};
+
 var foldp = function(stepFName, triggerArgName, savedArgName, initial, triggerId) {
     
     var id = basicNode('foldp', {
