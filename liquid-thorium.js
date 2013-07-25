@@ -1,3 +1,4 @@
+
 // All of the nodes
 var contexts = {}
 // Node ids of inputs
@@ -96,12 +97,12 @@ var startup = function(n) {
     });
 }
 
-var basicNode = function(type, node) {
+var basicNode = function(type, attrs) {
     if (started) {
         throw new Error('Containment breach');
     }
     var id = guid7();
-    node = node || {};
+    node = attrs || {};
     node.type = type;
     node.id = id;
     node.kids = [];
@@ -123,14 +124,66 @@ var input = function(initial) {
         value: initial
     });
     return id;
-}
+};
+
+var constant = function(initial) { return input(initial); };
 
 var output = function(action, parentId) {
     var id = basicNode('output', {action: action});
-    link(parentId, id)
+    link(parentId, id);
+    return id;
+};
+
+var fmap = function(fName, argName, parentId) {
+    var id = basicNode('fmap', {
+        fName: fName,
+        argName: argName
+    });
+    link(parentId, id);
+    return id;
+};
+
+var app = function(argName, fId, argId) {
+    
+    var queues = {};
+    var lastVals = {};
+    _.each([fId,argId], function(parentId) {
+        queues[parentId] = [];
+        lastVals[parentId] = undefined;
+    });
+    
+    var id = basicNode('app', {
+        argName:argName,
+        fId:fId,
+        argId:argId,
+        queues: queues,
+        lastVals: lastVals
+    });
+    
+    _.each([fId,argId], function(parentId) {
+        link(parentId, id);
+    });
+
+    return id;
+
+};
+
+var foldp = function(stepFName, triggerArgName, savedArgName, initial, triggerId) {
+    
+    var id = basicNode('foldp', {
+        stepFName:stepFName,
+        triggerArgName:triggerArgName,
+        savedArgName:savedArgName,
+        saved:initial,
+        first:true
+    });
+
+    link(triggerId, id);
+
     return id;
 }
 
+/*
 var liftN = function(fName, parentIds) {
 
     var queues = {};
@@ -151,3 +204,4 @@ var liftN = function(fName, parentIds) {
     });
     return id;
 }
+*/

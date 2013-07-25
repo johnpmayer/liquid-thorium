@@ -1,15 +1,26 @@
 
 var m = mouse();
-print(m);
+//print(m);
+show('mouse',m);
 draw("box",m);
 
-var x = liftN('getX', [m]);
-print(x);
+var x = fmap('getX', 'record', m);
+show('x',x);
 
-var y = liftN('getY', [m]);
-print(y);
+var y = fmap('getY', 'record', m);
+show('y',y);
 
-var s = liftN('combine', [x,y]);
-print(s);
+var s0 = fmap('concat', 'a', x)
+var s = app('b', s0, y);
+//print(s);
 
-startup(5);
+var c = foldp('counter', '_', 'saved', 0, m);
+show('count',c);
+
+var label = constant('Count is => ');
+var cc0 = fmap('concat', 'a', label);
+var cc = app('b', cc0, c);
+//print(cc);
+
+startup(3);
+

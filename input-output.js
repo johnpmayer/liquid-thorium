@@ -38,6 +38,14 @@ var print = function(parentId) {
     }, parentId);
 }
 
+var show = function(id, parentId) {
+    var element = document.getElementById(id)
+    var paragraphOutput = output(function(v) {
+        element.innerHTML = JSON.stringify(v);
+    }, parentId);
+}
+
+// draw : Signal {a|x:Int,y:Int} -> Component
 var draw = function(id, parentId) {
     
     var canvas = document.getElementById(id)
@@ -50,3 +58,4 @@ var draw = function(id, parentId) {
         ctx.fillRect(0, 0, m.x, m.y)
     }, parentId);
 }
+
