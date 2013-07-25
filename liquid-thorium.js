@@ -69,30 +69,32 @@ var workerAvailable = function(worker) {
     });
 }
 
+var reactorOutput = function(output) {
+    switch (output.data.type) {
+        case 'msg':
+            var message = output.data.message;
+            schedule(message);
+            break;
+        case 'done':
+            var node = output.data.node;
+            var ctx = contexts[node.id];
+            ctx.node = node;
+            ctx.state = 'idle';
+            if (ctx.inbox.length > 0) {
+                readyNodeQ.push(node.id);
+            }
+            workerAvailable(reactor);
+            break;
+        default:
+            break;
+    }
+};
+
 var startup = function(n) {
     started = true;
     _.each(_.range(n), function(i) {
         var reactor = new Worker('reactor.js');
-        reactor.onmessage = function(output) {
-            switch (output.data.type) {
-            case 'msg':
-                var message = output.data.message;
-                schedule(message);
-                break;
-            case 'done':
-                var node = output.data.node;
-                var ctx = contexts[node.id];
-                ctx.node = node;
-                ctx.state = 'idle';
-                if (ctx.inbox.length > 0) {
-                    readyNodeQ.push(node.id);
-                }
-                workerAvailable(reactor);
-                break;
-            default:
-                break;
-            }
-        };
+        reactor.onmessage = reactorOutput;
         workerAvailable(reactor);
     });
 }
@@ -192,7 +194,7 @@ var liftN = function(fName, parentIds) {
         queues[parentId] = [];
         lastVals[parentId] = undefined;
     });
-     
+
     var id = basicNode('liftN', {
         fName: fName, 
         parentIds: parentIds, 
