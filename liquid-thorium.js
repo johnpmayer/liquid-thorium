@@ -52,7 +52,7 @@ var startup = function(graph,n) {
     }
 
     function sendkids(from,updated,value,kids) {
-        _.each(inputs, function(id) {
+        _.each(kids, function(id) {
             schedule({
                 from: from,
                 to: id,
@@ -67,7 +67,7 @@ var startup = function(graph,n) {
         var node = nodes[id];
         switch (node.type) {
             case 'input':
-                sendKids(id,msg.updated,msg.value,node.kids);
+                sendkids(id,msg.updated,msg.value,node.kids);
                 break;
             case 'output':
                 if (msg.updated) {
@@ -89,11 +89,11 @@ var startup = function(graph,n) {
     }
 
     var triggerInput = function(targetId, value) {
-        _.each(inputs, function(id) {
-            var updated = (id === targetId);
+        _.each(inputs, function(input) {
+            var updated = (input.id === targetId);
             schedule({
                 from: undefined,
-                to: id,
+                to: input.id,
                 updated: updated,
                 value: updated ? value : undefined
             });
@@ -104,7 +104,9 @@ var startup = function(graph,n) {
         var trigger = function(value) {
             triggerInput(input.id, value);
         };
-        input.setup(trigger);
+        if (input.setup) {
+            input.setup(trigger);
+        }
     });
 
     _.each(nodes, function(node,id) {
