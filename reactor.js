@@ -13,7 +13,13 @@ self.onmessage = function (msg) {
 
     if (!f) throw "Couldn't find function " + fName;
 
-    var value = f(fEnv);
+    var value;
+    
+    try {
+        value = f(fEnv);
+    } catch (e) {
+        throw JSON.stringify(["Got error in reactor",data]);
+    }
 
     postMessage({
         id: id,

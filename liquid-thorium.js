@@ -105,12 +105,14 @@ var startup = function(graph,n) {
                     case MATCH1 | WAITQ1:
                         var fMsg = msg;
                         var argMsg = node.argQ.shift();
-                        var updating = fMsg.updated || argMsg.updated;
-                        if (updating) {
+                        var updated = fMsg.updated || argMsg.updated;
+                        if (updated) {
                             node.state = RUNNING;
                             node.fThunk = fMsg.updated ? fMsg.value : fLast;
                             node.fArg = argMsg.updated ? argMsg.value : argLast;
                             startNode(node);
+                        } else {
+                            throw "TODO";
                         }
                         break;
                     case MATCH2 | IDLE:
@@ -118,15 +120,18 @@ var startup = function(graph,n) {
                     case MATCH2 | WAITQ1:
                     case MATCH2 | RUNNING:
                         node.argQ.push(msg);
+                        break;
                     case MATCH2 | WAITQ2:
                         var fMsg = node.fQ.shift();
                         var argMsg = node.argQ.shfit();
-                        var updating = fMsg.updated || argMsg.updated;
-                        if (updating) {
+                        var updated = fMsg.updated || argMsg.updated;
+                        if (updated) {
                             node.state = RUNNING;
                             node.fThunk = fMsg.updated ? fMsg.value : fLast;
                             node.fArg = argMsg.updated ? argMsg.value : argLast;
                             startNode(node);
+                        } else {
+                            throw "TODO";
                         }
                         break;
                     default:
@@ -134,6 +139,47 @@ var startup = function(graph,n) {
                 }
                 break;
             case 'sampleOn':
+                var sourceSignal 
+                    = (msg.from === node.triggerId) ? MATCH1
+                    : (msg.form === node.sampleId) ? MATCH2
+                    : 0;
+                switch (sourceSignal | node.state) {
+                    case MATCH1 | IDLE:
+                        node.state = WAITQ2;
+                    case MATCH1 | WAITQ2: 
+                    case MATCH1 | RUNNING: 
+                        node.triggerQ.push(msg);
+                        break;
+                    case MATCH1 | WAITQ1:
+                        var triggerMsg = msg;
+                        var sampleMsg = node.sampleQ.shift();
+                        var updated = triggerMsg.updated;
+                        var value 
+                            = !updated ? undefined 
+                            : sampleMsg.updated ? sampleMsg.value 
+                            : node.sampleLast;
+                        sendkids(node.id,updated,value,node.kids);
+                        break;
+                    case MATCH2 | IDLE:
+                        node.state = WAITQ1;
+                    case MATCH2 | WAITQ1:
+                    case MATCH2 | RUNNING:
+                        node.sampleQ.push(msg);
+                        break;
+                    case MATCH2 | WAITQ2:
+                        var triggerMsg = node.triggerQ.shift();
+                        var sampleMsg = msg;
+                        var updated = triggerMsg.updated;
+                        var value 
+                            = !updated ? undefined 
+                            : sampleMsg.updated ? sampleMsg.value 
+                            : node.sampleLast;
+                        sendkids(node.id,updated,value,node.kids);
+                        break;
+                    default:
+                        break;
+                }
+                break;
             default:
                 throw "Cannot schedule node type " + node.type + " not implemented";
                 break;
@@ -169,8 +215,16 @@ var startup = function(graph,n) {
     function reactorOutput(reactor, output) {
         var data = output.data;
         var id = data.id;
-        var kids = nodes[id].kids;
+        var node = nodes[id];
+        var kids = node.kids;
         var value = data.value;
+        switch (node.type) {
+            case 'foldp':
+                node.hiddenstate = value;
+                break;
+            default:
+                break;
+        }
         sendkids(id,true,value,kids);
         startWorker(reactor);
     };
