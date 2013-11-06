@@ -56,7 +56,9 @@ var startup = function(graph,n) {
         postWorker(worker,node);
     }
 
-    function sendkids(from,updated,value,kids) {
+    function sendkids(node,updated,value) {
+        var from = node.id;
+        var kids = node.kids;
         _.each(kids, function(id) {
             schedule({
                 from: from,
@@ -72,7 +74,7 @@ var startup = function(graph,n) {
         var node = nodes[id];
         switch (node.type) {
             case 'input':
-                sendkids(id,msg.updated,msg.value,node.kids);
+                sendkids(node,msg.updated,msg.value);
                 break;
             case 'output':
                 if (msg.updated) {
@@ -82,13 +84,21 @@ var startup = function(graph,n) {
             case 'lift':
                 node.env = {}
                 node.env[node.argName] = msg.value;
-                startNode(node);
+                if (msg.updated) {
+                    startNode(node);
+                } else {
+                    sendkids(node,false,undefined);
+                }
                 break;
             case 'foldp':
                 node.env = {}
                 node.env[node.argName] = msg.value;
                 node.env[node.stateName] = node.hiddenstate;
-                startNode(node);
+                if (msg.updated) {
+                    startNode(node);
+                } else {
+                    sendkids(node,false,undefined);
+                }
                 break;
             case 'app':
                 var sourceSignal 
@@ -158,7 +168,7 @@ var startup = function(graph,n) {
                             = !updated ? undefined 
                             : sampleMsg.updated ? sampleMsg.value 
                             : node.sampleLast;
-                        sendkids(node.id,updated,value,node.kids);
+                        sendkids(node,updated,value,node);
                         break;
                     case MATCH2 | IDLE:
                         node.state = WAITQ1;
@@ -174,7 +184,7 @@ var startup = function(graph,n) {
                             = !updated ? undefined 
                             : sampleMsg.updated ? sampleMsg.value 
                             : node.sampleLast;
-                        sendkids(node.id,updated,value,node.kids);
+                        sendkids(node,updated,value,node);
                         break;
                     default:
                         break;
@@ -225,7 +235,7 @@ var startup = function(graph,n) {
             default:
                 break;
         }
-        sendkids(id,true,value,kids);
+        sendkids(node,true,value);
         startWorker(reactor);
     };
 
