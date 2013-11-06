@@ -24,9 +24,12 @@ var cc0 = builder.lift('concat', 'a', label);
 var cc = builder.app('b', cc0, c);
 //print(cc);
 
+/*
 var clicks = clicks(builder);
 var sample = builder.sampleOn(clicks, s);
 show(builder, 'sample', sample);
+*/
 
-startup(builder.graph());
+var graph = builder.graph();
+startup(graph,1);
 

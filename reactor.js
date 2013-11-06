@@ -2,8 +2,6 @@
 importScripts('underscore.js');
 importScripts('pure.js');
 
-function yieldEvaluated (id, value) {
-
 self.onmessage = function (msg) {
 
     var data = msg.data;
@@ -13,8 +11,13 @@ self.onmessage = function (msg) {
 
     var f = self[fName];
 
+    if (!f) throw "Couldn't find function " + fName;
+
     var value = f(fEnv);
 
-    yieldEvaluated(id,value);
+    postMessage({
+        id: id,
+        value: value
+    });
 
 };

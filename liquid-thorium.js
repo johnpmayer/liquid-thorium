@@ -3,10 +3,12 @@
  * This represents the scheduler and graphbuilder
  */ 
 
-var IDLE        = 0
-var WAIT_QUEUE1 = 1
-var WAIT_QUEUE2 = 2
-var RUNNING     = 3
+var IDLE    = 0
+var WAITQ1  = 1
+var WAITQ2  = 2
+var RUNNING = 3
+var MATCH1  = 4
+var MATCH2  = 8
 
 var guid7 = function() {
     return ((Math.random() * 0x10000000)|0).toString(16)
@@ -19,10 +21,10 @@ var startup = function(graph,n) {
     var readyNodeQ = [];
     var idleWorkerQ = [];
 
-    function startWorker(worker,node) {
+    function postWorker(worker,node) {
         var id = node.id;
-        var fName = node.fThunk.name;
-        var fEnv = fThunk.env;
+        var fName = node.fThunk ? node.fThunk.name : node.fName;
+        var fEnv = node.fThunk ? fThunk.env : {};
         fEnv[node.argname] = node.fArg;
         worker.postMessage({
             id: id,
@@ -31,24 +33,24 @@ var startup = function(graph,n) {
         });
     }
 
-    function scheduleWorker(worker) {
+    function startWorker(worker) {
         var id = readyNodeQ.shift();
-        if (!nodeid) {
+        if (!id) {
             idleWorkerQ.push(worker);
             return;
         }
         var node = nodes[id];
-        startWorker(worker,node);
+        postWorker(worker,node);
     }
 
-    function scheduleNode(node) {
+    function startNode(node) {
         var worker = idleWorkerQ.shift();
         if (!worker) {
             var id = node.id;
             readyNodeQ.push(id);
             return;
         }
-        startWorker(worker,node);
+        postWorker(worker,node);
     }
 
     function sendkids(from,updated,value,kids) {
@@ -75,15 +77,62 @@ var startup = function(graph,n) {
                 }
                 break;
             case 'lift':
-                // send to worker
+                node.env = {}
+                node.env[node.argName] = msg.value;
+                startNode(node);
+                break;
+            case 'foldp':
+                node.env = {}
+                node.env[node.argName] = msg.value;
+                node.env[node.stateName] = node.hiddenstate;
+                startNode(node);
                 break;
             case 'app':
-                // add queues, check
-                // // send to worker
+                var sourceSignal 
+                    = (msg.from === node.fId) ? MATCH1
+                    : (msg.form === node.argId) ? MATCH2
+                    : 0;
+                switch (sourceSignal | node.state) {
+                    case MATCH1 | IDLE:
+                        node.state = WAITQ2;
+                    case MATCH1 | WAITQ2: // no state change
+                    case MATCH1 | RUNNING: // no state change
+                        node.fQ.push(msg);
+                        break;
+                    case MATCH1 | WAITQ1:
+                        var fMsg = msg;
+                        var argMsg = node.argQ.shift();
+                        var updating = fMsg.updated || argMsg.updated;
+                        if (updating) {
+                            node.state = RUNNING;
+                            node.fThunk = fMsg.updated ? fMsg.value : fLast;
+                            node.fArg = argMsg.updated ? argMsg.value : argLast;
+                            startNode(node);
+                        }
+                        break;
+                    case MATCH2 | IDLE:
+                        node.state = WAITQ1;
+                    case MATCH2 | WAITQ1:
+                    case MATCH2 | RUNNING:
+                        node.argQ.push(msg);
+                    case MATCH2 | WAITQ2:
+                        var fMsg = node.fQ.shift();
+                        var argMsg = node.argQ.shfit();
+                        var updating = fMsg.updated || argMsg.updated;
+                        if (updating) {
+                            node.state = RUNNING;
+                            node.fThunk = fMsg.updated ? fMsg.value : fLast;
+                            node.fArg = argMsg.updated ? argMsg.value : argLast;
+                            startNode(node);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                break;
             case 'sampleOn':
-                // add queues, check
-                // // send to worker
             default:
+                throw "Cannot schedule node type " + node.type + " not implemented";
                 break;
         }
     }
@@ -119,14 +168,14 @@ var startup = function(graph,n) {
         var kids = nodes[id].kids;
         var value = output.value;
         sendkids(id,true,value,kids);
-        workerAvailable(reactor);
+        startWorker(reactor);
     };
 
     // Start web workers and add them to the queue, taking work immediately
     _.each(_.range(n), function(i) {
         var reactor = new Worker('reactor.js');
         reactor.onmessage = function(output){reactorOutput(reactor,output);};
-        workerAvailable(reactor);
+        startWorker(reactor);
     });
 
     return triggerInput;
@@ -203,7 +252,7 @@ function GraphBuilder() {
     /*
      * Apply a known function to a signal of arguments
      */
-    this.lift = function(argName, fName, parentId) {
+    this.lift = function(fName, argName, parentId) {
         // At this point it would prudent to check that argName is unique
         var id = baseNode('lift', {
             argName: argName,
@@ -224,7 +273,8 @@ function GraphBuilder() {
             fLast: null,
             argId: argId,
             argQ: [],
-            argLast: null
+            argLast: null,
+            state: IDLE,
         });
         link(fId, id);
         link(argId, id);
@@ -241,6 +291,7 @@ function GraphBuilder() {
             sampleId: sampleId,
             sampleQ: [],
             sampleLast: null,
+            state: IDLE,
         });
         link(triggerId, id);
         link(sampleId, id);
@@ -253,7 +304,7 @@ function GraphBuilder() {
             fName: fName,
             argName: argName,
             stateName: stateName,
-            initial: initial
+            hiddenstate: initial
         });
         link(updateId, id);
         return id;
