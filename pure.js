@@ -16,7 +16,7 @@ function getY (env) {
 // combine_0 : Int -> Thunk (Int |> Int -> String)
 function concat (env) {
     return {
-        fName:'concat_1',
+        name:'concat_1',
         env:{a:env.a}
     };
 };

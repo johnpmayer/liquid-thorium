@@ -25,7 +25,7 @@ var startup = function(graph,n) {
         var id = node.id;
         var fName = node.fThunk ? node.fThunk.name : node.fName;
         var fEnv 
-            = node.fThunk ? fThunk.env
+            = node.fThunk ? node.fThunk.env
             : node.env ? node.env
             : {};
         fEnv[node.argname] = node.fArg;
@@ -103,7 +103,7 @@ var startup = function(graph,n) {
             case 'app':
                 var sourceSignal 
                     = (msg.from === node.fId) ? MATCH1
-                    : (msg.form === node.argId) ? MATCH2
+                    : (msg.from === node.argId) ? MATCH2
                     : 0;
                 switch (sourceSignal | node.state) {
                     case MATCH1 | IDLE:
@@ -122,7 +122,7 @@ var startup = function(graph,n) {
                             node.fArg = argMsg.updated ? argMsg.value : argLast;
                             startNode(node);
                         } else {
-                            throw "TODO";
+                            sendkids(node,false,undefined);
                         }
                         break;
                     case MATCH2 | IDLE:
@@ -141,7 +141,7 @@ var startup = function(graph,n) {
                             node.fArg = argMsg.updated ? argMsg.value : argLast;
                             startNode(node);
                         } else {
-                            throw "TODO";
+                            sendkids(node,false,undefined);
                         }
                         break;
                     default:
@@ -212,14 +212,15 @@ var startup = function(graph,n) {
         var trigger = function(value) {
             triggerInput(input.id, value);
         };
+        schedule({
+            from: undefined,
+            to: input.id,
+            updated: true,
+            value: input.initial,
+        });
         if (input.setup) {
             input.setup(trigger);
         }
-    });
-
-    _.each(nodes, function(node,id) {
-        // Not sure what goes on here
-        var foo = null
     });
 
     function reactorOutput(reactor, output) {
