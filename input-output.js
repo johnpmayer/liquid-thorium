@@ -22,45 +22,48 @@ function throttle(fn, threshhold, scope) {
 }
 
 // mouse : Signal {x=Int,y=Int}
-var mouse = function() {
+var mouse = function(builder) {
     var initial = {x:0,y:0};
-    var mouseId = input(initial);
-    window.onmousemove = throttle(function(e){
-       triggerInput(mouseId, {x:e.x,y:e.y})
-    }, 50);
+    var setup = function(trigger) {
+        window.onmousemove = throttle(function(e){
+            trigger({x:e.x,y:e.y})
+        }, 50);
+    }
+    var mouseId = builder.input(initial,setup);
     return mouseId;
 }
 
 // clicks : Signal ()
-var clicks = function() {
+var clicks = function(builder) {
     var unit = { type : 'unit' };
-    var clicksId =  input(unit);
-    window.onclick = function(e) {
-        triggerInput(clicksId, unit);
+    var setup = function(trigger) {
+        window.onclick = function(e) {
+            trigger(unit);
+        };
     };
+    var clicksId = builder.input(unit,setup);
     return clicksId;
 }
 
 // print : Signal a -> Component
-var print = function(parentId) {
-    var printOutput = output(function(x) {
+var print = function(builder,parentId) {
+    var printOutput = builder.output(function(x) {
         console.log(x);
     }, parentId);
 }
 
-var show = function(id, parentId) {
+var show = function(builder,id,parentId) {
     var element = document.getElementById(id)
-    var paragraphOutput = output(function(v) {
+    var paragraphOutput = builder.output(function(v) {
         element.innerHTML = JSON.stringify(v);
     }, parentId);
 }
 
 // draw : Signal {a|x:Int,y:Int} -> Component
-var draw = function(id, parentId) {
-    
+var draw = function(builder, id, parentId) {
     var canvas = document.getElementById(id)
     var ctx = canvas.getContext("2d");
-    var drawOutput = output(function(m) {
+    var drawOutput = builder.output(function(m) {
         ctx.save()
         ctx.setTransform(1,0,0,1,0,0)
         ctx.clearRect(0,0,canvas.width,canvas.height)
