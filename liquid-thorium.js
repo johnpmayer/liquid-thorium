@@ -24,7 +24,10 @@ var startup = function(graph,n) {
     function postWorker(worker,node) {
         var id = node.id;
         var fName = node.fThunk ? node.fThunk.name : node.fName;
-        var fEnv = node.fThunk ? fThunk.env : {};
+        var fEnv 
+            = node.fThunk ? fThunk.env
+            : node.env ? node.env
+            : {};
         fEnv[node.argname] = node.fArg;
         worker.postMessage({
             id: id,
@@ -164,9 +167,10 @@ var startup = function(graph,n) {
     });
 
     function reactorOutput(reactor, output) {
-        var id = output.id;
+        var data = output.data;
+        var id = data.id;
         var kids = nodes[id].kids;
-        var value = output.value;
+        var value = data.value;
         sendkids(id,true,value,kids);
         startWorker(reactor);
     };
