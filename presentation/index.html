@@ -1,0 +1,120 @@
+<html>
+    <body>
+        <h1>Liquid Thorium</h1>
+        <h2>Parallel CFRP on Web Workers</h2>
+
+        <p><a href="https://github.com/johnpmayer/liquid-thorium">Code on GitHub</a>
+
+        <h3>How does the Elm runtime work?</h3>
+
+        <p>Signal threaded, no yielding. One entire round at a time for each input.
+
+        <p>Definition: an input node is a node with no incoming edges
+
+        <ol>
+            <li>Update message sent to target input node
+            <li>NoUpdate message sent to all other input nodes
+            <li>Messages are propogated through the graph via depth-first traversal
+        </ol>
+
+        <h4>Is this a bad thing?</h4>
+
+        <p>Well we can consider the following scenarios
+
+        <ul>
+            <li>Lack of vertical (pipelined) parallelism <a href="#">Example</a>
+            <li>Lack of horizontal (independent, or data?) parallelism <a href="#">Example</a>
+        </ul>
+
+        <h3>CFRP is designed to be parallel!</h3>
+
+        <ul>
+            <li>Message Model
+            <li>Immutable data
+            <li>These are actors!
+            <li>Actually even simpler
+        </ul>
+
+        <h3>So what gives, Evan?</h3>
+
+        <p>Hold on. Javascript is, as usual, our culprit. How might we do this in another language?
+
+        <ul>
+            <li>Erlang TODO verify that it's multiplexed
+            <li>Scala TODO verify same
+            <li>Haskell<ul>
+                <li>Each node is a forkIO
+                <li>Each edges is a MVar or TChan
+            </ul>
+            <li>Golang<ul>
+                <li>Each node is a goroutine
+                <li>Each edge is a channel, possibly buffered
+            </ul>
+        </ul>
+
+        <p>Each of these languages have lightweight threads that are multiplexed onto real threads. Javascript, naturally, has no such thing.
+
+        <h3>Multiwhat?</h3>
+
+        <p>From a very high level, multiplexing is the process of running many tasks on finite number of engines. 
+        
+        <ul>
+            <li>Operating systems multiplex threads onto your CPUs
+            <li>Databases typically multiplex query/update execution onto virtual engines
+            <li>Many language runtimes will multiplex their lightweight threads onto OS threads
+        </ul>
+
+        <p>It always involves a scheduler, which makes a few important decisions
+
+        <ul>
+            <li>Which engine do I use to run this task that I have
+            <li>Is it time to remove a currently running task from an engine?
+        </ul>
+
+        <h3>Multiplexing in CFRP</h3>
+
+        <p>For liquid-thorium, function application is the task, and web workers are the engines
+
+        <ul>
+            <li>lift needs to apply a constant function to updated arguments
+            <li>app needs to apply updated functions to updated arguments
+            <li>foldp needs to apply a constant function to updated arguments and state
+        </ul>
+
+        <p>Worth noting that everything else can just be done by the scheduler.
+
+        <ul>
+            <li>sampleOn and merge don't really inspect the values of their input signals
+            <li>What about dropRepeat/filter? I guess that depends on the cost of the equality test; might be worthwhile to run these in parallel also. They're not currently supported. They can't be implemented in the language itself, as they do still alter the behavior of change messages. These are neat combinators.
+        </ul>
+
+        <h3>Requisite data structures</h3>
+
+        <ul>
+            <li>Task queue holds all of the nodes that can be sent to a worker. Only becomes non-empty when all web-workers are busy.
+            <li>Engine queue holds all of the workers that are ready for work. Only becomes non-empty when all nodes are idle.
+            <li>Signal graph representation is very similar to the real Elm implementation, where nodes have a kids array of ids of nodes to send update messages. Input list is also similar.
+            <li>Message wait queues for any node that has 2 inputs, such as app, or sampleOn. We need to wait until both input signal have sent a message before we can decide what to do.
+        </ul>
+        
+        <h3>Code architecture</h3>
+
+        <ul>
+            <li>Library Code<ul>
+                <li>liquid-thorium.js provides the scheduler, and also a GraphBuilder "class" to produce a graph which complies with the scheduler's expectations.
+                <li>reactor.js tells the web workers how to comunicate with the scheduler, but mostly are just dumb function application loops
+                <li>input-output.js provides a handful of pre-made input and output nodes, like mouse and keyboard inputs, and innerHTML and canvas display,
+            </ul>
+            <li>User Code<ul>
+                <li>Pure code must be in a separate file. All functions should be written to work with a single environment object input. They should also adhere to a specific thunk convention if they are going to return a lambda with free variables.
+                <li>Setup code configures the graph and kickstarts the runtime
+            </ul>
+        </ul>
+
+        <h3>Can the compiler help?</h3>
+
+        <p>Function composition optimization
+        <p>lift (f . g) == lift f . lift g
+
+    </body>
+</html>
