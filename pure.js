@@ -26,7 +26,7 @@ function concat_1 (env) {
     return env.a + "" + env.b;
 }
 
-// counter : a -> Int -> Int
+// counter : (a,Int) -> Int
 function counter (env) {
     // ignore env.trigger
     return env.saved + 1;
