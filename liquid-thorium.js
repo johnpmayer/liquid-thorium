@@ -79,11 +79,18 @@ var startup = function(graph,n) {
                 }
                 break;
             case 'lift':
-                if (msg.updated) {
-                    node.fArg = msg.value;
-                    startNode(node);
-                } else {
-                    sendkids(node,false,undefined);
+                switch (node.state) {
+                    case IDLE:
+                        if (msg.updated) {
+                            node.fArg = msg.value;
+                            startNode(node);
+                        } else {
+                            sendkids(node,false,undefined);
+                        }
+                        break;
+                    case RUNNING:
+                        node.argQ.push(msg);
+                        break;
                 }
                 break;
             case 'foldp':
@@ -241,21 +248,48 @@ var startup = function(graph,n) {
         var kids = node.kids;
         var value = data.value;
         switch (node.type) {
+            case 'lift':
+                node.state = node.argQ.length > 0 ? RUNNING : IDLE;
+                while (node.state === RUNNING) {
+                    sendkids(node,true,value);
+                    var argMsg = node.argQ.shift();
+                    var updated = argMsg.updated;
+                    if (updated) {
+                        postWorker(reactor,node);
+                        return;
+                    } else {
+                        sendKids(node,false,undefined);
+                        node.state = node.argQ.length > 0 ? RUNNING : IDLE;
+                    }
+                }
+                break;
             case 'foldp':
                 node.hiddenstate = value;
+                node.state = node.argQ.length > 0 ? RUNNING : IDLE;
+                while (node.state === RUNNING) {
+                    sendkids(node,true,value);
+                    var argMsg = node.argQ.shift();
+                    var updated = argMsg.updated;
+                    if (updated) {
+                        postWorker(reactor,node);
+                        return;
+                    } else {
+                        sendKids(node,false,undefined);
+                        node.state = node.argQ.length > 0 ? RUNNING : IDLE;
+                    }
+                }
                 break;
             case 'app':
                 node.state 
                     = node.fQ.length > 0
                     ? (node.argQ.length > 0 ? RUNNING : WAITQ2) 
                     : (node.argQ.length > 0 ? WAITQ1 : IDLE); 
-                if (node.state === RUNNING) {
+                while (node.state === RUNNING) {
                     sendkids(node,true,value);
                     var fMsg = node.fQ.shift();
                     var argMsg = node.argQ.shift();
                     var updated = fMsg.updated || argMsg.updated;
                     if (updated) {
-                        node.state = RUNNING;
                         if (fMsg.updated) {
                             node.fThunk = fMsg.value;
                         }
@@ -263,8 +297,13 @@ var startup = function(graph,n) {
                             node.fArg = argMsg.value;
                         }
                         postWorker(reactor,node);
+                        return;
                     } else {
                         sendkids(node,false,undefined);
+                        node.state 
+                            = node.fQ.length > 0
+                            ? (node.argQ.length > 0 ? RUNNING : WAITQ2) 
+                            : (node.argQ.length > 0 ? WAITQ1 : IDLE); 
                     }
                     return;
                 }
@@ -361,7 +400,9 @@ function GraphBuilder() {
         // At this point it would prudent to check that argName is unique
         var id = baseNode('lift', {
             argName: argName,
-            fThunk: {env: {}, name: fName}
+            argQ: [],
+            fThunk: {env: {}, name: fName},
+            state: IDLE,
         });
         link(parentId, id);
         return id;
@@ -406,14 +447,25 @@ function GraphBuilder() {
             updateId: updateId,
             fThunk: {env: {}, name: fName},
             argName: argName,
+            argQ: [],
             stateName: stateName,
-            hiddenstate: initial
+            hiddenstate: initial,
+            state: IDLE,
         });
         link(updateId, id);
         return id;
     };
-    // foldp TODO
 
-    // promise? TODO
+    this.keepWhen = function(testId, sampleId) {
+
+    };
+
+    this.async = function(initial, sigId) {
+
+    };
+
+    this.promise = function(action) {
+
+    };
 
 };
