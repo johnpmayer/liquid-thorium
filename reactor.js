@@ -18,7 +18,7 @@ self.onmessage = function (msg) {
     try {
         value = f(fEnv);
     } catch (e) {
-        throw JSON.stringify(["Got error in reactor",data]);
+        throw JSON.stringify(["Got error in reactor",data,JSON.stringify(e)]);
     }
 
     postMessage({

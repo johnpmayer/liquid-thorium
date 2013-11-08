@@ -53,7 +53,7 @@ var startup = function(graph,n) {
         postWorker(worker,node);
     }
 
-    function sendkids(node,updated,value) {
+    function sendKids(node,updated,value) {
         var from = node.id;
         var kids = node.kids;
         _.each(kids, function(id) {
@@ -71,7 +71,7 @@ var startup = function(graph,n) {
         var node = nodes[id];
         switch (node.type) {
             case 'input':
-                sendkids(node,msg.updated,msg.value);
+                sendKids(node,msg.updated,msg.value);
                 break;
             case 'output':
                 if (msg.updated) {
@@ -81,11 +81,14 @@ var startup = function(graph,n) {
             case 'lift':
                 switch (node.state) {
                     case IDLE:
-                        if (msg.updated) {
+                        if (node.first || msg.updated) {
                             node.fArg = msg.value;
+                        }
+                        node.first = false;
+                        if (msg.updated) {
                             startNode(node);
                         } else {
-                            sendkids(node,false,undefined);
+                            sendKids(node,false,undefined);
                         }
                         break;
                     case RUNNING:
@@ -94,6 +97,11 @@ var startup = function(graph,n) {
                 }
                 break;
             case 'foldp':
+                if (node.first) {
+                    node.first = false;
+                    sendKids(node,true,node.hiddenstate);
+                    break;
+                }
                 foldEnv = {}
                 foldEnv[node.argName] = msg.value;
                 foldEnv[node.stateName] = node.hiddenstate;
@@ -101,10 +109,17 @@ var startup = function(graph,n) {
                     node.fThunk.env = foldEnv;
                     startNode(node);
                 } else {
-                    sendkids(node,false,undefined);
+                    sendKids(node,false,undefined);
                 }
                 break;
             case 'app':
+                var testState 
+                    = node.fQ.length > 0
+                    ? (node.argQ.length > 0 ? RUNNING : WAITQ2) 
+                    : (node.argQ.length > 0 ? WAITQ1 : IDLE); 
+                if (node.state !== testState) {
+                    node.state = testState;
+                }
                 var sourceSignal 
                     = (msg.from === node.fId) ? MATCH1
                     : (msg.from === node.argId) ? MATCH2
@@ -122,15 +137,16 @@ var startup = function(graph,n) {
                         var updated = fMsg.updated || argMsg.updated;
                         if (updated) {
                             node.state = RUNNING;
-                            if (fMsg.updated) {
+                            if (node.first || fMsg.updated) {
                                 node.fThunk = fMsg.value;
                             }
-                            if (argMsg.updated) {
+                            if (node.first || argMsg.updated) {
                                 node.fArg = argMsg.value;
                             }
+                            node.first = false;
                             startNode(node);
                         } else {
-                            sendkids(node,false,undefined);
+                            sendKids(node,false,undefined);
                         }
                         break;
                     case MATCH2 | IDLE:
@@ -145,15 +161,16 @@ var startup = function(graph,n) {
                         var updated = fMsg.updated || argMsg.updated;
                         if (updated) {
                             node.state = RUNNING;
-                            if (fMsg.updated) {
+                            if (node.first || fMsg.updated) {
                                 node.fThunk = fMsg.value;
                             }
-                            if (argMsg.updated) {
+                            if (node.first || argMsg.updated) {
                                 node.fArg = argMsg.value;
                             }
+                            node.first = false;
                             startNode(node);
                         } else {
-                            sendkids(node,false,undefined);
+                            sendKids(node,false,undefined);
                         }
                         break;
                     default:
@@ -179,7 +196,7 @@ var startup = function(graph,n) {
                             = !updated ? undefined 
                             : sampleMsg.updated ? sampleMsg.value 
                             : node.sampleLast;
-                        sendkids(node,updated,value,node);
+                        sendKids(node,updated,value,node);
                         node.state 
                             = node.sampleQ.length > 0
                             ? WAITQ1
@@ -198,7 +215,7 @@ var startup = function(graph,n) {
                             = !updated ? undefined 
                             : sampleMsg.updated ? sampleMsg.value 
                             : node.sampleLast;
-                        sendkids(node,updated,value,node);
+                        sendKids(node,updated,value,node);
                         node.state 
                             = node.triggerQ.length > 0
                             ? WAITQ2
@@ -226,21 +243,6 @@ var startup = function(graph,n) {
         });
     };
 
-    _.each(inputs, function(input) {
-        var trigger = function(value) {
-            triggerInput(input.id, value);
-        };
-        schedule({
-            from: undefined,
-            to: input.id,
-            updated: true,
-            value: input.initial,
-        });
-        if (input.setup) {
-            input.setup(trigger);
-        }
-    });
-
     function reactorOutput(reactor, output) {
         var data = output.data;
         var id = data.id;
@@ -251,7 +253,7 @@ var startup = function(graph,n) {
             case 'lift':
                 node.state = node.argQ.length > 0 ? RUNNING : IDLE;
                 while (node.state === RUNNING) {
-                    sendkids(node,true,value);
+                    sendKids(node,true,value);
                     var argMsg = node.argQ.shift();
                     var updated = argMsg.updated;
                     if (updated) {
@@ -267,7 +269,7 @@ var startup = function(graph,n) {
                 node.hiddenstate = value;
                 node.state = node.argQ.length > 0 ? RUNNING : IDLE;
                 while (node.state === RUNNING) {
-                    sendkids(node,true,value);
+                    sendKids(node,true,value);
                     var argMsg = node.argQ.shift();
                     var updated = argMsg.updated;
                     if (updated) {
@@ -285,21 +287,23 @@ var startup = function(graph,n) {
                     ? (node.argQ.length > 0 ? RUNNING : WAITQ2) 
                     : (node.argQ.length > 0 ? WAITQ1 : IDLE); 
                 while (node.state === RUNNING) {
-                    sendkids(node,true,value);
+                    sendKids(node,true,value);
                     var fMsg = node.fQ.shift();
                     var argMsg = node.argQ.shift();
                     var updated = fMsg.updated || argMsg.updated;
                     if (updated) {
-                        if (fMsg.updated) {
+                        if (node.firstF || fMsg.updated) {
                             node.fThunk = fMsg.value;
+                            node.firstF = false;
                         }
-                        if (argMsg.updated) {
+                        if (node.firstArg || argMsg.updated) {
                             node.fArg = argMsg.value;
+                            node.firstArg = false;
                         }
                         postWorker(reactor,node);
                         return;
                     } else {
-                        sendkids(node,false,undefined);
+                        sendKids(node,false,undefined);
                         node.state 
                             = node.fQ.length > 0
                             ? (node.argQ.length > 0 ? RUNNING : WAITQ2) 
@@ -311,9 +315,27 @@ var startup = function(graph,n) {
             default:
                 break;
         }
-        sendkids(node,true,value);
+        sendKids(node,true,value);
         startWorker(reactor);
     };
+
+    _.each(inputs, function(input) {
+        schedule({
+            from: undefined,
+            to: input.id,
+            updated: true,
+            value: input.initial,
+        });
+    });
+
+    _.each(inputs, function(input) {
+        var trigger = function(value) {
+            triggerInput(input.id, value);
+        };
+        if (input.setup) {
+            input.setup(trigger);
+        }
+    });
 
     // Start web workers and add them to the queue, taking work immediately
     _.each(_.range(n), function(i) {
@@ -321,8 +343,6 @@ var startup = function(graph,n) {
         reactor.onmessage = function(output){reactorOutput(reactor,output);};
         startWorker(reactor);
     });
-
-    return triggerInput;
 }
 
 function GraphBuilder() {
@@ -403,6 +423,7 @@ function GraphBuilder() {
             argQ: [],
             fThunk: {env: {}, name: fName},
             state: IDLE,
+            first: true,
         });
         link(parentId, id);
         return id;
@@ -419,6 +440,8 @@ function GraphBuilder() {
             argId: argId,
             argQ: [],
             state: IDLE,
+            firstF: true,
+            firstArg: true,
         });
         link(fId, id);
         link(argId, id);
@@ -450,6 +473,7 @@ function GraphBuilder() {
             argQ: [],
             stateName: stateName,
             hiddenstate: initial,
+            first: true,
             state: IDLE,
         });
         link(updateId, id);
@@ -461,7 +485,18 @@ function GraphBuilder() {
     };
 
     this.async = function(initial, sigId) {
-
+        var magic = {};
+        var setup = function(trigger) {
+            // TODO is this a redundant closure
+            magic.callback = function(value) {
+                trigger(value);
+            };
+        };
+        var asyncInId = that.input(initial, setup);
+        var asyncOutId = that.output(function(x) {
+            magic.callback(x);
+        }, sigId);
+        return asyncInId;
     };
 
     this.promise = function(action) {

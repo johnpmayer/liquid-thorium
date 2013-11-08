@@ -31,3 +31,15 @@ function counter (env) {
     // ignore env.trigger
     return env.saved + 1;
 }
+
+function fib (env) {
+    var fibHelp = function(n) {
+        if (n === 0 || n === 1) {
+            return 1;
+        } else {
+            return fibHelp(n-1) + fibHelp(n-2);
+        }
+    }
+    return fibHelp(env.n) + " "
+}
+

@@ -19,14 +19,21 @@ var cc0 = builder.lift('concat', 'a', label);
 var cc = builder.app('b', cc0, c);
 show(builder,'label',cc);
 
-/*
+var t = ticks(builder,1000);
+var clock = builder.foldp('counter', '_', 'saved', 35, t);
+//var clock = builder.constant(40);
+var fibclock = builder.lift('fib', 'n', clock);
+//var fibclock = builder.async("",builder.lift('fib', 'n', clock));
+var fb0 = builder.lift('concat', 'a', fibclock);
+var fb = builder.app('b', fb0, x);
+show(builder,'clock',fb);
+
 var s0 = builder.lift('concat', 'a', x)
 var s = builder.app('b', s0, y);
 var clicks = clicks(builder);
 var sample = builder.sampleOn(clicks, s);
 show(builder, 'sample', s);
-*/
 
 var graph = builder.graph();
-startup(graph,1);
+startup(graph,4);
 

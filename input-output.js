@@ -35,7 +35,7 @@ var mouse = function(builder) {
 
 // clicks : Signal ()
 var clicks = function(builder) {
-    var unit = { type : 'unit' };
+    var unit = { _type : 'unit' };
     var setup = function(trigger) {
         window.onclick = function(e) {
             trigger(unit);
@@ -43,7 +43,21 @@ var clicks = function(builder) {
     };
     var clicksId = builder.input(unit,setup);
     return clicksId;
-}
+};
+
+// Ticks : Signal ()
+var ticks = function(builder,n) {
+    var unit = { _type : 'unit' };
+    var setup = function(trigger) {
+        var q = function() {
+            trigger(unit);
+            setTimeout(q,n);
+        };
+        setTimeout(q,n);
+    };
+    var ticksId = builder.input(unit,setup);
+    return ticksId;
+};
 
 // print : Signal a -> Component
 var print = function(builder,parentId) {
