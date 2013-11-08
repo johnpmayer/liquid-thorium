@@ -1,17 +1,19 @@
 
+/// <reference path="underscore.d.ts" />
+
 /*
  * This represents the scheduler and graphbuilder
  */ 
 
-var IDLE    = 0
-var WAITQ1  = 1
-var WAITQ2  = 2
-var RUNNING = 3
-var MATCH1  = 4
-var MATCH2  = 8
+var IDLE    = 0;
+var WAITQ1  = 1;
+var WAITQ2  = 2;
+var RUNNING = 3;
+var MATCH1  = 4;
+var MATCH2  = 8;
 
 var guid7 = function() {
-    return ((Math.random() * 0x10000000)|0).toString(16)
+    return ((Math.random() * 0x10000000)|0).toString(16);
 }
 
 var startup = function(graph,n) {
@@ -21,7 +23,20 @@ var startup = function(graph,n) {
     var readyNodeQ = [];
     var idleWorkerQ = [];
 
-    function postWorker(worker,node) {
+    var workerJobs = [];
+    var workerDashboard = document.getElementById('dash');
+    function trackWorker(reactor,text) {
+        workerJobs[reactor.i] = text;
+        workerDashboard.innerHTML = JSON.stringify(workerJobs);
+    }
+
+    function postReactor(reactor,node) {
+        if (node.active) {
+            throw "Can't run a node twice";
+        }
+        trackWorker(reactor, node.id);
+        node.active = true;
+        var worker = reactor.worker;
         var id = node.id;
         var fName = node.fThunk.name;
         var fEnv = node.fThunk.env;
@@ -33,24 +48,29 @@ var startup = function(graph,n) {
         });
     }
 
-    function startWorker(worker) {
+    function startReactor(reactor) {
         var id = readyNodeQ.shift();
         if (!id) {
-            idleWorkerQ.push(worker);
+            idleWorkerQ.push(reactor);
             return;
         }
         var node = nodes[id];
-        postWorker(worker,node);
+        postReactor(reactor,node);
     }
 
     function startNode(node) {
-        var worker = idleWorkerQ.shift();
-        if (!worker) {
+        if (node.active) { 
+            node.blockReady = true;
+            return;
+        }
+        if (!node.fThunk) { throw "Missing thunk on scheduled node"; }
+        var reactor = idleWorkerQ.shift();
+        if (!reactor) {
             var id = node.id;
             readyNodeQ.push(id);
             return;
         }
-        postWorker(worker,node);
+        postReactor(reactor,node);
     }
 
     function sendKids(node,updated,value) {
@@ -102,7 +122,7 @@ var startup = function(graph,n) {
                     sendKids(node,true,node.hiddenstate);
                     break;
                 }
-                foldEnv = {}
+                var foldEnv = {}
                 foldEnv[node.argName] = msg.value;
                 foldEnv[node.stateName] = node.hiddenstate;
                 if (msg.updated) {
@@ -137,13 +157,14 @@ var startup = function(graph,n) {
                         var updated = fMsg.updated || argMsg.updated;
                         if (updated) {
                             node.state = RUNNING;
-                            if (node.first || fMsg.updated) {
+                            if (node.firstF || fMsg.updated) {
                                 node.fThunk = fMsg.value;
+                                node.firstF = false;
                             }
-                            if (node.first || argMsg.updated) {
+                            if (node.firstArg || argMsg.updated) {
                                 node.fArg = argMsg.value;
+                                node.firstArg = false;
                             }
-                            node.first = false;
                             startNode(node);
                         } else {
                             sendKids(node,false,undefined);
@@ -161,13 +182,14 @@ var startup = function(graph,n) {
                         var updated = fMsg.updated || argMsg.updated;
                         if (updated) {
                             node.state = RUNNING;
-                            if (node.first || fMsg.updated) {
+                            if (node.firstF || fMsg.updated) {
                                 node.fThunk = fMsg.value;
+                                node.firstF = false;
                             }
-                            if (node.first || argMsg.updated) {
+                            if (node.firstArg || argMsg.updated) {
                                 node.fArg = argMsg.value;
+                                node.firstArg = false;
                             }
-                            node.first = false;
                             startNode(node);
                         } else {
                             sendKids(node,false,undefined);
@@ -196,7 +218,7 @@ var startup = function(graph,n) {
                             = !updated ? undefined 
                             : sampleMsg.updated ? sampleMsg.value 
                             : node.sampleLast;
-                        sendKids(node,updated,value,node);
+                        sendKids(node,updated,value);
                         node.state 
                             = node.sampleQ.length > 0
                             ? WAITQ1
@@ -215,7 +237,7 @@ var startup = function(graph,n) {
                             = !updated ? undefined 
                             : sampleMsg.updated ? sampleMsg.value 
                             : node.sampleLast;
-                        sendKids(node,updated,value,node);
+                        sendKids(node,updated,value);
                         node.state 
                             = node.triggerQ.length > 0
                             ? WAITQ2
@@ -247,6 +269,8 @@ var startup = function(graph,n) {
         var data = output.data;
         var id = data.id;
         var node = nodes[id];
+        node.active = false;
+        trackWorker(reactor, "");
         var kids = node.kids;
         var value = data.value;
         switch (node.type) {
@@ -257,7 +281,7 @@ var startup = function(graph,n) {
                     var argMsg = node.argQ.shift();
                     var updated = argMsg.updated;
                     if (updated) {
-                        postWorker(reactor,node);
+                        postReactor(reactor,node);
                         return;
                     } else {
                         sendKids(node,false,undefined);
@@ -273,7 +297,7 @@ var startup = function(graph,n) {
                     var argMsg = node.argQ.shift();
                     var updated = argMsg.updated;
                     if (updated) {
-                        postWorker(reactor,node);
+                        postReactor(reactor,node);
                         return;
                     } else {
                         sendKids(node,false,undefined);
@@ -288,6 +312,10 @@ var startup = function(graph,n) {
                     : (node.argQ.length > 0 ? WAITQ1 : IDLE); 
                 while (node.state === RUNNING) {
                     sendKids(node,true,value);
+                    if (node.blockReady) {
+                        node.blockReady = false;
+                        postReactor(reactor,node);
+                    }
                     var fMsg = node.fQ.shift();
                     var argMsg = node.argQ.shift();
                     var updated = fMsg.updated || argMsg.updated;
@@ -300,7 +328,7 @@ var startup = function(graph,n) {
                             node.fArg = argMsg.value;
                             node.firstArg = false;
                         }
-                        postWorker(reactor,node);
+                        postReactor(reactor,node);
                         return;
                     } else {
                         sendKids(node,false,undefined);
@@ -316,7 +344,7 @@ var startup = function(graph,n) {
                 break;
         }
         sendKids(node,true,value);
-        startWorker(reactor);
+        startReactor(reactor);
     };
 
     _.each(inputs, function(input) {
@@ -339,9 +367,13 @@ var startup = function(graph,n) {
 
     // Start web workers and add them to the queue, taking work immediately
     _.each(_.range(n), function(i) {
-        var reactor = new Worker('reactor.js');
-        reactor.onmessage = function(output){reactorOutput(reactor,output);};
-        startWorker(reactor);
+        var worker = new Worker('reactor.js');
+        var reactor = {
+            i: i,
+            worker: worker
+        };
+        worker.onmessage = function(output){reactorOutput(reactor,output);};
+        startReactor(reactor);
     });
 }
 
@@ -367,7 +399,7 @@ function GraphBuilder() {
      * to the signal graph that we're building
      */
     var baseNode = function(type, attrs) {
-        node = attrs || {};
+        var node = attrs || {};
         var id = guid7();
         node.id = id;
         node.type = type;
@@ -391,7 +423,7 @@ function GraphBuilder() {
      * The id for input should also be used as the async input address
      */
     this.input = function(initial, setup) {
-        var id = baseNode('input');
+        var id = baseNode('input', {});
         that.inputs.push({id:id,initial:initial,setup:setup});
         return id;
     };
@@ -400,7 +432,7 @@ function GraphBuilder() {
      * Convenience wrapper
      */
     this.constant = function(initial) {
-        return that.input(initial);
+        return that.input(initial, undefined);
     };
 
     /*
@@ -485,7 +517,7 @@ function GraphBuilder() {
     };
 
     this.async = function(initial, sigId) {
-        var magic = {};
+        var magic = {callback: undefined};
         var setup = function(trigger) {
             // TODO is this a redundant closure
             magic.callback = function(value) {

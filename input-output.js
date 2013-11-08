@@ -74,15 +74,24 @@ var show = function(builder,id,parentId) {
 }
 
 // draw : Signal {a|x:Int,y:Int} -> Component
-var draw = function(builder, id, parentId) {
-    var canvas = document.getElementById(id)
+var draw = function(builder, id1, id2, parentId) {
+    var canvas = document.getElementById(id1)
+    var text = document.getElementById(id2)
     var ctx = canvas.getContext("2d");
-    var drawOutput = builder.output(function(m) {
+    var drawOutput = builder.output(function(scene) {
+        text.innerHTML = JSON.stringify(scene.info);
+        var m = scene.mouse;
         ctx.save()
         ctx.setTransform(1,0,0,1,0,0)
         ctx.clearRect(0,0,canvas.width,canvas.height)
         ctx.restore()
+        /*
         ctx.fillRect(0, 0, m.x, m.y)
+        */
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, 10, 0, 2 * Math.PI, false);
+        ctx.fillStyle = 'green';
+        ctx.fill();
     }, parentId);
 }
 
