@@ -1,3 +1,3 @@
 
 all:
-	tsc liquid-thorium.ts
+	tsc liquid-thorium.ts --outDir build

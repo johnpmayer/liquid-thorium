@@ -4,9 +4,14 @@ function getX (env) {
     return env.record.x;
 }
 
-// getY ; {a|y:Int} -> Int
+// getY : {a|y:Int} -> Int
 function getY (env) {
     return env.record.y;
+}
+
+// stringy : a -> String
+function stringy (env) {
+    return JSON.stringify(env.stuff);
 }
 
 /*
@@ -26,6 +31,20 @@ function concat_1 (env) {
     return env.a + "" + env.b;
 }
 
+function combine (env) {
+    return {
+        name:'combine_1',
+        env:{mouse:env.mouse}
+    };
+};
+
+function combine_1 (env) {
+    return {
+        mouse: env.mouse,
+        info: env.info
+    };
+};
+
 // counter : (a,Int) -> Int
 function counter (env) {
     // ignore env.trigger
@@ -40,6 +59,7 @@ function fib (env) {
             return fibHelp(n-1) + fibHelp(n-2);
         }
     }
-    return fibHelp(env.n) + " "
+    var n = Math.min(40,env.n);
+    return "fib(" + n + ") = " + fibHelp(n) + " ";
 }
 
